@@ -29,6 +29,7 @@ class Device(ABC):
         self.friendly_name = self.serial_number
         self.model_number = registration['SystemModelNumber']
         self.default_register_set = None
+        self.last_ack = None
 
     def __getitem__(self, key):
         return self.registration[key]
@@ -53,6 +54,7 @@ class Device(ABC):
                 ack = arloSock.receive()
                 if (ack != None):
                     if (ack['ID'] == message['ID']):
+                        self.last_ack = ack
                         s_print(f"<[{self.ip}][{self.id}] {ack.toNetworkMessage()}")
                         if ('Response' in ack and ack['Response'] != "Ack"):
                             result = False
@@ -88,6 +90,32 @@ class Device(ABC):
 
     def register_set(self, set_values):
         return self.send_register_set_values(set_values)
+
+    def register_get(self, names):
+        """
+        Read register values back off a device.
+
+        The camera answers a registerGet with its current values in GetReturn:
+
+            > {"Type":"registerGet","GetValues":["NightVisionMode"],"ID":1}
+            < {"Type":"response","ID":1,"Response":"Ack",
+               "GetReturn":{"NightVisionMode":true}}
+
+        GetValues must be a list of register names. Registers the model does not
+        implement are omitted from GetReturn rather than erroring, so this also
+        works as a capability probe.
+
+        Returns the {name: value} dict, or None if the device did not answer.
+        """
+        message = Message({"Type": "registerGet", "GetValues": list(names)})
+        self.last_ack = None
+        if not self.send_message(message):
+            return None
+
+        if 'GetReturn' not in self.last_ack:
+            return None
+
+        return self.last_ack['GetReturn']
 
     def send_message_dict(self, message_dict):
         message = Message(message_dict)

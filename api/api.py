@@ -223,5 +223,24 @@ def register_set(serial, req_body, device: Device):
     return flask.jsonify({"result": result})
 
 
+@app.route('/device/<serial>/registerget', methods=['POST'])
+@validate_device_request()
+def register_get(serial, req_body, device: Device):
+    """
+    Read register values back off a device. See Device.register_get.
+
+    POST /device/<serial>/registerget
+    { "names": ["NightVisionMode", "DuskToDawnThrshVal"] }
+    """
+    names = req_body.get('names')
+    # NB: this module defines a route function called list(), so the builtin is
+    # shadowed here and isinstance(names, list) would raise TypeError.
+    if not names or isinstance(names, (str, dict)):
+        flask.abort(400)
+
+    values = device.register_get(names)
+    return flask.jsonify({"result": values is not None, "values": values or {}})
+
+
 def get_thread():
     return threading.Thread(target=app.run(host='0.0.0.0'))

@@ -172,21 +172,33 @@ def set_activity_zones(serial, req_body, device: Camera):
 
 @app.route('/snapshot/<identifier>/', methods=['POST'])
 def receive_snapshot(identifier):
-    if 'file' not in flask.request.files:
+    # Cameras upload the fullSnapshot as multipart/form-data with a part named "file" whose
+    # filename is EMPTY (seen on Pro 4 VMC4041PB and Pro 5S VMC4060B), so an empty filename must
+    # not be rejected. Accept any multipart file part regardless of its name, and a raw JPEG body
+    # (image/jpeg or application/octet-stream) for firmwares that do not use multipart.
+    start_path = os.path.abspath('/tmp')
+    target_path = os.path.join(start_path, f"{identifier}.jpg")
+    common_prefix = os.path.commonprefix([target_path, start_path])
+    if common_prefix != start_path:
         flask.abort(400)
+
+    content_type = flask.request.content_type or ''
+    if flask.request.files:
+        file = flask.request.files.get('file') or next(iter(flask.request.files.values()))
+        data = file.read()
+    elif content_type.startswith(('image/', 'application/octet-stream')) or not content_type.startswith('multipart/'):
+        data = flask.request.get_data()
     else:
-        file = flask.request.files['file']
-        if file.filename == '':
-            flask.abort(400)
-        else:
-            start_path = os.path.abspath('/tmp')
-            target_path = os.path.join(start_path, f"{identifier}.jpg")
-            common_prefix = os.path.commonprefix([target_path, start_path])
-            if (common_prefix != start_path):
-                flask.abort(400)
-            else:
-                file.save(target_path)
-            return ""
+        flask.abort(400)
+    if not data:
+        flask.abort(400)
+
+    tmp_path = target_path + '.part'
+    with open(tmp_path, 'wb') as fo:
+        fo.write(data)
+    os.replace(tmp_path, target_path)
+    app.logger.info(f"snapshot from {identifier}: {len(data)} bytes ({content_type.split(';')[0]})")
+    return flask.jsonify({"result": True, "bytes": len(data)})
 
 
 @app.route('/snapshot/<identifier>', methods=['GET'])

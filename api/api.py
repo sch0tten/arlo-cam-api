@@ -216,7 +216,8 @@ def get_snapshot(identifier):
         # after writing, cursor will be at last byte, so move it to start
         return_data.seek(0)
         # delete the file
-        os.remove(target_path)
+        if flask.request.args.get('delete') == '1':
+            os.remove(target_path)   # one-shot read only on request; keep the file for thumbnails
         # send it to client
         return send_file(return_data, mimetype='image/jpeg', download_name=f'{identifier}.jpg')
 

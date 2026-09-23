@@ -87,8 +87,13 @@ class ConnectionThread(threading.Thread):
                                 "")
                     elif alert_type == "audioAlert":
                         if NOTIFY_ON_AUDIO_ALERT:
-                            # TODO: implement this
-                            ...
+                            detect = msg['AudioDetect'] if 'AudioDetect' in msg else {}
+                            webhook_manager.audio_detected(
+                                device.ip, device.friendly_name, device.hostname, device.serial_number, True, detect)
+                    elif alert_type == "audioTimeoutAlert":
+                        if NOTIFY_ON_AUDIO_ALERT:
+                            webhook_manager.audio_detected(
+                                device.ip, device.friendly_name, device.hostname, device.serial_number, False, {})
                     elif alert_type == "buttonPressAlert":
                         if NOTIFY_ON_BUTTON_PRESS_ALERT:
                             webhook_manager.button_pressed(

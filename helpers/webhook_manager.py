@@ -52,6 +52,21 @@ class WebHookManager:
     def __motion_timeout(self, ip, friendly_name, hostname, serial_number, _time, url, encoding, timeout):
         return {"ip": ip, "friendly_name": friendly_name, "hostname": hostname, "serial_number": serial_number, "time": _time}
 
+    ### AUDIO DETECTED / TIMEOUT (arlo-local) ###
+
+    def audio_detected(self, ip, friendly_name, hostname, serial_number, triggered, detect):
+        url = self.config.get('AudioRecordingWebHookUrl')
+        if not url:
+            return
+        r = self.__audio(ip, friendly_name, hostname, serial_number, triggered, detect, time.time(),
+                         url=url, encoding="application/json", timeout=5)
+        s_print(str(r))
+
+    @webhook(sender_callable=targeted.sender)
+    def __audio(self, ip, friendly_name, hostname, serial_number, triggered, detect, _time, url, encoding, timeout):
+        return {"ip": ip, "friendly_name": friendly_name, "hostname": hostname, "serial_number": serial_number,
+                "triggered": triggered, "audio": detect, "time": _time}
+
     ### BUTTON PRESSED ###
 
     def button_pressed(self, ip, friendly_name, hostname, serial_number, triggered):

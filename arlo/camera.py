@@ -152,7 +152,58 @@ class Camera(Device):
         set_values = {
             'UserStreamActive': int(active)
         }
-        return self.send_register_set_values(set_values)
+        # never persisted: a default of UserStreamActive=1 would make the camera stream on every registration
+        return self.send_register_set_values(set_values, persist_default=False)
+
+    # ---- arlo-local additions ----
+    SPOTLIGHT_MODES = {"constant": 0, "flash": 1, "pulsate": 2}
+
+    def get_settings(self, names=None):
+        """registerGet of the known setting registers (arlo.messages.SETTINGS_KEYS) -> {name: value} or None."""
+        return self.register_get(list(names) if names else arlo.messages.SETTINGS_KEYS)
+
+    def set_settings(self, values):
+        """registerSet of a whitelisted subset; persisted as the device default (re-sent on every registration).
+        Returns (ok, unknown_keys). UserStreamActive and SpotlightEnabled are momentary and never persisted."""
+        unknown = [k for k in values if k not in arlo.messages.SETTINGS_KEYS]
+        if unknown:
+            return None, unknown
+        momentary = {k: v for k, v in values.items() if k in ("UserStreamActive", "SpotlightEnabled")}
+        durable = {k: v for k, v in values.items() if k not in momentary}
+        ok = True
+        if durable:
+            ok = self.send_register_set_values(durable)
+        if ok and momentary:
+            ok = self.send_register_set_values(momentary, persist_default=False)
+        return ok, []
+
+    def spotlight(self, args):
+        """{"on": bool, "intensity": 0-100 (%), "mode": constant|flash|pulsate, "duration": seconds}
+        Intensity / mode / duration are persisted settings; SpotlightEnabled is momentary (the camera turns the
+        light off after SpotlightDurationManual)."""
+        settings = {}
+        if "intensity" in args:
+            pct = max(0, min(100, float(args["intensity"])))
+            settings["SpotlightIntensityManual"] = int(round(pct * 257))      # 25700 == 100 %
+        if "mode" in args:
+            settings["SpotlightModeManual"] = self.SPOTLIGHT_MODES.get(str(args["mode"]).lower(), 0)
+        if "duration" in args:
+            settings["SpotlightDurationManual"] = int(args["duration"])
+        if settings and not self.send_register_set_values(settings):
+            return False
+        return self.send_register_set_values({"SpotlightEnabled": bool(args.get("on", True))}, persist_default=False)
+
+    def siren(self, args):
+        """{"state": "on"|"off", "duration": s, "volume": 1-8, "pattern": "alarm"} -> the camera's response is in
+        self.last_ack (the REST returns it: the accepted SirenState strings are still being established)."""
+        msg = Message(copy.deepcopy(arlo.messages.SIREN))
+        state = args.get("state", "on")
+        msg["SirenState"] = state if isinstance(state, str) else ("on" if state else "off")
+        for key, field in (("duration", "Duration"), ("volume", "Volume"), ("pattern", "Pattern")):
+            if key in args:
+                msg[field] = args[key]
+        self.last_ack = None
+        return self.send_message(msg)
 
     def snapshot_request(self, url):
         _snapshot_request = Message(copy.deepcopy(arlo.messages.SNAPSHOT))

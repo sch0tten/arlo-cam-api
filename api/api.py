@@ -86,12 +86,12 @@ def status_request(serial, device: Device):
 @app.route('/device/<serial>/userstreamactive', methods=['POST'])
 @validate_device_request()
 def user_stream_active(serial, req_body, device: Camera):
-    # active = req_body["active"]
-    # if active is None:
-    #     flask.abort(400)
-
-    # result = device.set_user_stream_active(int(active))
-    return flask.jsonify({"result": True})
+    # arlo-local: this used to be a no-op that answered {"result": true} without talking to the camera.
+    active = req_body.get("active")
+    if active is None:
+        flask.abort(400)
+    result = device.set_user_stream_active(int(active))
+    return flask.jsonify({"result": result})
 
 
 @app.route('/device/<serial>/arm', methods=['POST'])
@@ -220,6 +220,47 @@ def get_snapshot(identifier):
             os.remove(target_path)   # one-shot read only on request; keep the file for thumbnails
         # send it to client
         return send_file(return_data, mimetype='image/jpeg', download_name=f'{identifier}.jpg')
+
+
+# ---- arlo-local additions: settings / spotlight / siren ----
+
+@app.route('/device/<serial>/settings', methods=['GET', 'POST'])
+@validate_device_request(body_required=False)
+def settings(serial, device: Camera):
+    """
+    GET  -> {"result": true, "values": {register: value, ...}}   (registerGet of arlo.messages.SETTINGS_KEYS)
+    POST {"NightVisionMode": false, "PIRStartSensitivity": 60, ...}
+         -> registerSet of those keys (whitelisted, persisted as the device default), then the values read back:
+            {"result": true, "values": {...}}; unknown keys -> 400 {"unknown": [...]}
+    """
+    if flask.request.method == 'GET':
+        values = device.get_settings()
+        return flask.jsonify({"result": values is not None, "values": values or {}})
+    body = flask.request.get_json(silent=True)
+    if not isinstance(body, dict) or not body:
+        flask.abort(400)
+    ok, unknown = device.set_settings(body)
+    if unknown:
+        return flask.jsonify({"result": False, "unknown": unknown}), 400
+    values = device.get_settings(body.keys()) if ok else None
+    return flask.jsonify({"result": bool(ok), "values": values or {}})
+
+
+@app.route('/device/<serial>/spotlight', methods=['POST'])
+@validate_device_request()
+def spotlight(serial, req_body, device: Camera):
+    """{"on": true|false, "intensity": 0-100, "mode": "constant"|"flash"|"pulsate", "duration": seconds}"""
+    result = device.spotlight(req_body)
+    return flask.jsonify({"result": result})
+
+
+@app.route('/device/<serial>/siren', methods=['POST'])
+@validate_device_request()
+def siren(serial, req_body, device: Camera):
+    """{"state": "on"|"off", "duration": s, "volume": 1-8, "pattern": "alarm"} -> the camera's raw response too"""
+    result = device.siren(req_body)
+    response = device.last_ack.dictionary if device.last_ack is not None else None
+    return flask.jsonify({"result": result, "response": response})
 
 
 @app.route('/device/<serial>/message', methods=['POST'])

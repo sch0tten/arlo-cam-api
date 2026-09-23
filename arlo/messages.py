@@ -1338,3 +1338,42 @@ REGISTER_SET_HIGH_QUALITY_FLOODLIGHT = {
         "HEVCVideoTargetBitrate": 1000,
     }
 }
+
+# ---- arlo-local additions (sch0tten/arlo-cam-api, branch arlo-local) ----
+# Registers a Pro 4 (VMC4041PB fw 34.0.17) and a Pro 5S (VMC4060B fw 38.0.253) answer in a registerGet
+# (probed 2026-09-22). GET /device/<serial>/settings reads them all, POST writes a subset. A model that does not
+# implement a key simply omits it from the reply, so this list is also the capability probe.
+SETTINGS_KEYS = [
+    # arming / detection
+    "PIRTargetState", "PIRStartSensitivity", "PIRAction", "VideoMotionEstimationEnable", "VideoMotionSensitivity",
+    "AudioTargetState", "AudioStartSensitivity", "AudioAction",
+    "DefaultMotionStreamTimeLimit", "MaxMotionStreamTimeLimit", "MaxUserStreamTimeLimit", "MaxStreamTimeLimit",
+    "ArloSmart", "CvrModeEnabled", "UserStreamActive",
+    # spotlight (Pro 4 / Pro 5S / Ultra / floodlight)
+    "SpotlightEnabled", "SpotlightIntensityManual", "SpotlightModeManual", "SpotlightDurationManual",
+    "SpotlightIntensityAlert", "SpotlightModeAlert",
+    # night vision / image
+    "NightVisionMode", "NightModeGrey", "NightModeLightSourceAlert", "DuskToDawnThrshVal", "IRLedState", "IRCutState",
+    "HdrControl", "VideoFlip", "VideoMirror", "VideoExposureCompensation", "VideoMode", "VideoSmartZoom",
+    "VideoAntiFlickerRate", "VideoOutputResolution", "VideoTargetBitrate",
+    "HEVCVideoOutputResolution", "HEVCVideoTargetBitrate", "JPEGOutputResolution",
+    # audio
+    "AudioMicEnable", "AudioMicVolume", "AudioMicAGC", "AudioMicWNS", "AudioSpkrEnable", "AudioSpkrVolume",
+    # LEDs
+    "PIREnableLED", "PIRLEDSensitivity", "ChargeNotificationLed", "StreamingLedEnabled", "StatusLed",
+    # radio / misc
+    "MaxMissedBeaconTime", "WifiCountryCode",
+]
+
+# Siren: `siren` is a known message type on the Pro 4 (unknown types are Nack'ed; a non-string SirenState is
+# "SirenState value Invalid"). The accepted SirenState strings are NOT yet confirmed — every non-firing value
+# tried answers "Ack with Errors" without naming the error; the field set below mirrors the Arlo cloud API
+# (sirenState / duration / volume / pattern). docs/SPRINT-1-CAMERA-APP.md §4 has the audible test.
+SIREN = {
+    "Type": "siren",
+    "ID": -1,
+    "SirenState": "on",
+    "Duration": 300,
+    "Volume": 8,
+    "Pattern": "alarm"
+}

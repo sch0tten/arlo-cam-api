@@ -264,6 +264,15 @@ def reboot(serial, device: Camera):
     return flask.jsonify({"result": result})
 
 
+@app.route('/device/<serial>/factoryreset', methods=['POST'])
+@validate_device_request(body_required=False)
+def factory_reset(serial, device: Camera):
+    """registerSet {"FactoryReset": 1}: the camera forgets its Wi-Fi and base station and waits for a new sync —
+    what the Arlo app does on "remove device". Never persisted (a persisted Reboot put a camera in a loop)."""
+    result = device.send_register_set_values({"FactoryReset": 1}, persist_default=False)
+    return flask.jsonify({"result": result})
+
+
 @app.route('/device/<serial>/siren', methods=['POST'])
 @validate_device_request()
 def siren(serial, req_body, device: Camera):

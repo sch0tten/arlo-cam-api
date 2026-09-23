@@ -254,6 +254,16 @@ def spotlight(serial, req_body, device: Camera):
     return flask.jsonify({"result": result})
 
 
+@app.route('/device/<serial>/reboot', methods=['POST'])
+@validate_device_request(body_required=False)
+def reboot(serial, device: Camera):
+    """registerSet {"Reboot": 1}: the camera acknowledges, drops off the network at once and re-registers ~1-2 min
+    later (Pro 4 VMC4041PB, 2026-09-22). The way out of a stuck user stream (a session the camera keeps feeding
+    after its client died: UserStreamActive reads 1, UserStreamed keeps counting, no new client is accepted)."""
+    result = device.send_register_set_values({"Reboot": 1}, persist_default=False)
+    return flask.jsonify({"result": result})
+
+
 @app.route('/device/<serial>/siren', methods=['POST'])
 @validate_device_request()
 def siren(serial, req_body, device: Camera):

@@ -67,6 +67,21 @@ class WebHookManager:
         return {"ip": ip, "friendly_name": friendly_name, "hostname": hostname, "serial_number": serial_number,
                 "triggered": triggered, "audio": detect, "time": _time}
 
+    ### SPOTLIGHT ON / OFF (arlo-local) ###
+
+    def spotlight_changed(self, ip, friendly_name, hostname, serial_number, enabled):
+        url = self.config.get('SpotlightWebHookUrl')
+        if not url:
+            return
+        r = self.__spotlight(ip, friendly_name, hostname, serial_number, enabled, time.time(),
+                             url=url, encoding="application/json", timeout=5)
+        s_print(str(r))
+
+    @webhook(sender_callable=targeted.sender)
+    def __spotlight(self, ip, friendly_name, hostname, serial_number, enabled, _time, url, encoding, timeout):
+        return {"ip": ip, "friendly_name": friendly_name, "hostname": hostname, "serial_number": serial_number,
+                "enabled": enabled, "time": _time}
+
     ### BUTTON PRESSED ###
 
     def button_pressed(self, ip, friendly_name, hostname, serial_number, triggered):

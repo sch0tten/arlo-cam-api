@@ -99,6 +99,14 @@ class ConnectionThread(threading.Thread):
                             webhook_manager.button_pressed(
                                 device.ip, device.friendly_name, device.hostname, device.serial_number,
                                 msg['ButtonPress']['Triggered'])
+                    elif alert_type == "spotlightAlert":
+                        # arlo-local: the camera reports when its spotlight LEDs actually turn on/off
+                        # ({"SpotlightState": {"SpotlightEnabled": true}}) — by its own motion logic or a manual
+                        # SpotlightEnabled register, which only lights in night mode.
+                        state = msg['SpotlightState'] if 'SpotlightState' in msg else {}
+                        webhook_manager.spotlight_changed(
+                            device.ip, device.friendly_name, device.hostname, device.serial_number,
+                            bool(state.get('SpotlightEnabled', False)))
                     elif alert_type == "motionTimeoutAlert":
                         if NOTIFY_ON_MOTION_TIMEOUT_ALERT:
                             webhook_manager.motion_timeout(
